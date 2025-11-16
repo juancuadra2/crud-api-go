@@ -37,11 +37,11 @@ This project demonstrates a clean implementation of a CRUD REST API in Go follow
 
 ### Built With
 
-- [Go](https://golang.org/) - Programming language
-- [Gin](https://github.com/gin-gonic/gin) or [Echo](https://echo.labstack.com/) - HTTP web framework
-- [GORM](https://gorm.io/) or [sqlx](https://github.com/jmoiron/sqlx) - Database ORM/toolkit
-- [PostgreSQL](https://www.postgresql.org/) - Database (can be swapped)
-- [Docker](https://www.docker.com/) - Containerization
+- [Go](https://golang.org/) 1.25.3 - Programming language
+- [Gin](https://github.com/gin-gonic/gin) v1.11.0 - HTTP web framework
+- [GORM](https://gorm.io/) v1.31.1 - Database ORM
+- [MySQL](https://www.mysql.com/) - Database
+- [UUID](https://github.com/google/uuid) - ID generation
 
 ## 🏗️ Architecture
 
@@ -102,44 +102,39 @@ This project follows the **Hexagonal Architecture** (also known as Ports and Ada
 .
 ├── cmd/
 │   └── api/
-│       └── main.go                 # Application entry point
+│       └── main.go                  # Application entry point
+├── config/
+│   └── config.go                    # Configuration management
 ├── internal/
-│   ├── domain/                     # Domain layer (entities, value objects)
-│   │   ├── entity/
-│   │   │   └── user.go            # Domain entities
-│   │   └── repository/
-│   │       └── user_repository.go # Repository interfaces (ports)
-│   ├── application/                # Application layer (use cases)
-│   │   └── service/
-│   │       └── user_service.go    # Business logic/use cases
-│   └── infrastructure/             # Infrastructure layer (adapters)
-│       ├── adapter/
-│       │   ├── http/              # HTTP handlers (primary adapter)
-│       │   │   ├── handler/
-│       │   │   │   └── user_handler.go
-│       │   │   ├── middleware/
-│       │   │   │   └── error_handler.go
-│       │   │   └── router/
-│       │   │       └── router.go
-│       │   └── repository/        # Database implementation (secondary adapter)
-│       │       └── postgres/
-│       │           └── user_repository.go
-│       ├── config/                 # Configuration
-│       │   └── config.go
-│       └── database/               # Database connection
-│           └── connection.go
-├── pkg/                            # Public reusable packages
-│   ├── logger/
-│   └── validator/
-├── test/                           # Integration and e2e tests
-├── docker/
-│   └── Dockerfile
-├── .env.example                    # Environment variables template
+│   ├── core/                        # Core domain layer
+│   │   ├── domain/
+│   │   │   └── models/
+│   │   │       └── user.go          # Domain entities
+│   │   ├── ports/                   # Interfaces (ports)
+│   │   │   ├── user_repository.go   # Repository port
+│   │   │   └── user_service.go      # Service port
+│   │   └── services/
+│   │       └── user_use_case.go     # Business logic/use cases
+│   └── adapters/                    # Adapters layer
+│       ├── primary/                 # Primary/Driving adapters
+│       │   └── rest/
+│       │       ├── dtos/            # Data Transfer Objects
+│       │       │   ├── create_user_dto.go
+│       │       │   ├── update_user_dto.go
+│       │       │   ├── user_dto.go
+│       │       │   └── error_response_dto.go
+│       │       ├── handlers/
+│       │       │   └── user_handler.go  # HTTP handlers
+│       │       └── router/
+│       │           └── router.go        # Route configuration
+│       └── secondary/               # Secondary/Driven adapters
+│           └── mysql_adapter/
+│               ├── user_adapter.go  # MySQL implementation
+│               └── entity/
+│                   └── user_entity.go
 ├── .gitignore
-├── docker-compose.yml
 ├── go.mod
 ├── go.sum
-├── Makefile                        # Build and development commands
 └── README.md
 ```
 
@@ -147,10 +142,9 @@ This project follows the **Hexagonal Architecture** (also known as Ports and Ada
 
 Before you begin, ensure you have the following installed:
 
-- **Go** 1.21 or higher - [Download](https://golang.org/dl/)
-- **Docker** and **Docker Compose** - [Download](https://www.docker.com/get-started)
-- **PostgreSQL** 15+ (if running locally without Docker)
-- **Make** (optional, for using Makefile commands)
+- **Go** 1.25.3 or higher - [Download](https://golang.org/dl/)
+- **MySQL** 8.0+ (running locally or accessible remotely)
+- **Git** - For cloning the repository
 
 ## 🚀 Installation
 
@@ -167,87 +161,60 @@ cd crud-api-go
 go mod download
 ```
 
-### 3. Copy environment configuration
+### 3. Configure environment variables
 
-```bash
-cp .env.example .env
-```
+You can configure the application using environment variables or use the default values defined in `config/config.go`.
 
-Edit `.env` file with your configuration values.
+Available environment variables:
+- `DB_HOST` - Database host (default: "localhost")
+- `DB_PORT` - Database port (default: "3306")
+- `DB_USER` - Database user (default: "jcuadrado")
+- `DB_PASS` - Database password (default: "jcuadrado")
+- `DB_NAME` - Database name (default: "go_lab")
+- `SERVER_PORT` - Server port (default: "8080")
 
 ## ⚙️ Configuration
 
-The application uses environment variables for configuration. Create a `.env` file based on `.env.example`:
+The application uses environment variables for configuration. You can set these variables or use the default values:
 
 ```env
-# Application
-APP_NAME=crud-api-go
-APP_ENV=development
-APP_PORT=8080
-
-# Database
+# Database Configuration
 DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=crud_db
-DB_SSLMODE=disable
+DB_PORT=3306
+DB_USER=jcuadrado
+DB_PASS=jcuadrado
+DB_NAME=go_lab
 
-# JWT (if using authentication)
-JWT_SECRET=your-secret-key
-JWT_EXPIRATION=24h
-
-# Logging
-LOG_LEVEL=debug
+# Server Configuration
+SERVER_PORT=8080
 ```
+
+The configuration is managed through `config/config.go`, which loads environment variables with fallback to default values.
 
 ## 🏃 Running the Application
 
-### Using Docker Compose (Recommended)
+### Prerequisites
+1. Ensure MySQL is running and accessible
+2. Create the database: `CREATE DATABASE go_lab;`
+3. Configure environment variables (optional, default values will be used)
+
+### Run the application
 
 ```bash
-# Start all services (API + Database)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f api
-
-# Stop services
-docker-compose down
+# Run directly with Go
+go run cmd/api/main.go
 ```
 
 The API will be available at `http://localhost:8080`
 
-### Using Make Commands
+### Build and run
 
 ```bash
-# Run the application
-make run
-
-# Run with hot reload (using air)
-make dev
-
 # Build the application
-make build
+go build -o bin/api cmd/api/main.go
 
-# Run tests
-make test
-
-# Run linter
-make lint
-```
-
-### Manual Execution
-
-```bash
-# Start PostgreSQL (if not using Docker)
-# Make sure PostgreSQL is running on port 5432
-
-# Run migrations (if applicable)
-make migrate-up
-
-# Run the application
-go run cmd/api/main.go
+# Run the built binary
+./bin/api
 ```
 
 ## 📚 API Documentation
@@ -281,7 +248,7 @@ curl -X POST http://localhost:8080/api/v1/users \
   -d '{
     "name": "John Doe",
     "email": "john.doe@example.com",
-    "age": 30
+    "password": "secret123"
   }'
 ```
 
@@ -290,10 +257,7 @@ curl -X POST http://localhost:8080/api/v1/users \
 {
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "name": "John Doe",
-  "email": "john.doe@example.com",
-  "age": 30,
-  "created_at": "2025-11-15T10:00:00Z",
-  "updated_at": "2025-11-15T10:00:00Z"
+  "email": "john.doe@example.com"
 }
 ```
 
@@ -306,18 +270,68 @@ curl http://localhost:8080/api/v1/users
 
 **Response:**
 ```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "name": "John Doe",
+    "email": "john.doe@example.com"
+  },
+  {
+    "id": "456e7890-e89b-12d3-a456-426614174001",
+    "name": "Jane Smith",
+    "email": "jane.smith@example.com"
+  }
+]
+```
+
+#### Get User by ID
+
+**Request:**
+```bash
+curl http://localhost:8080/api/v1/users/123e4567-e89b-12d3-a456-426614174000
+```
+
+**Response:**
+```json
 {
-  "data": [
-    {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "name": "John Doe",
-      "email": "john.doe@example.com",
-      "age": 30,
-      "created_at": "2025-11-15T10:00:00Z",
-      "updated_at": "2025-11-15T10:00:00Z"
-    }
-  ],
-  "total": 1
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "John Doe",
+  "email": "john.doe@example.com"
+}
+```
+
+#### Update User
+
+**Request:**
+```bash
+curl -X PUT http://localhost:8080/api/v1/users/123e4567-e89b-12d3-a456-426614174000 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Updated",
+    "email": "john.updated@example.com"
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "John Updated",
+  "email": "john.updated@example.com"
+}
+```
+
+#### Delete User
+
+**Request:**
+```bash
+curl -X DELETE http://localhost:8080/api/v1/users/123e4567-e89b-12d3-a456-426614174000
+```
+
+**Response:**
+```json
+{
+  "message": "User deleted successfully"
 }
 ```
 
@@ -325,14 +339,7 @@ curl http://localhost:8080/api/v1/users
 
 ```json
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input data",
-    "details": [
-      "email is required",
-      "age must be greater than 0"
-    ]
-  }
+  "message": "name is required"
 }
 ```
 
@@ -352,43 +359,33 @@ Run unit tests for individual components:
 
 ```bash
 # Run all tests
-make test
+go test ./...
 
 # Run tests with coverage
-make test-coverage
+go test -cover ./...
 
 # Run tests for specific package
-go test ./internal/application/service/...
-```
-
-### Integration Tests
-
-```bash
-# Run integration tests
-make test-integration
-
-# Run with Docker
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+go test ./internal/core/services/...
 ```
 
 ### Test Structure
 
 ```
 internal/
-├── domain/
-│   └── entity/
-│       └── user_test.go
-├── application/
-│   └── service/
-│       └── user_service_test.go
-└── infrastructure/
-    └── adapter/
-        ├── http/
-        │   └── handler/
-        │       └── user_handler_test.go
-        └── repository/
-            └── postgres/
-                └── user_repository_test.go
+├── core/
+│   ├── domain/
+│   │   └── models/
+│   │       └── user_test.go
+│   └── services/
+│       └── user_use_case_test.go
+└── adapters/
+    ├── primary/
+    │   └── rest/
+    │       └── handlers/
+    │           └── user_handler_test.go
+    └── secondary/
+        └── mysql_adapter/
+            └── user_adapter_test.go
 ```
 
 ## 💻 Development
@@ -406,83 +403,64 @@ This project follows Go standard conventions:
 
 ```bash
 # Run linter
-make lint
+golangci-lint run
 
 # Auto-fix linting issues
-make lint-fix
+golangci-lint run --fix
 ```
 
 ### Adding New Features
 
 When adding new features following hexagonal architecture:
 
-1. **Define the entity** in `internal/domain/entity/`
-2. **Create repository interface** in `internal/domain/repository/`
-3. **Implement use case** in `internal/application/service/`
-4. **Create HTTP handler** in `internal/infrastructure/adapter/http/handler/`
-5. **Implement repository** in `internal/infrastructure/adapter/repository/`
-6. **Register routes** in router
+1. **Define the entity** in `internal/core/domain/models/`
+2. **Create repository interface** in `internal/core/ports/`
+3. **Implement use case** in `internal/core/services/`
+4. **Create HTTP handler** in `internal/adapters/primary/rest/handlers/`
+5. **Implement repository** in `internal/adapters/secondary/mysql_adapter/`
+6. **Register routes** in `internal/adapters/primary/rest/router/`
 7. **Write tests** for each layer
 
 ### Database Migrations
 
-```bash
-# Create new migration
-make migrate-create name=create_users_table
+The application uses GORM's AutoMigrate feature. Add your entity to the migration in `cmd/api/main.go`:
 
-# Run migrations
-make migrate-up
-
-# Rollback migrations
-make migrate-down
-
-# Check migration status
-make migrate-status
+```go
+// Automigrate database schema
+if err := db.AutoMigrate(&entity.UserEntity{}); err != nil {
+    log.Fatal("Failed to migrate database schema:", err)
+}
 ```
 
 ## 🚢 Deployment
 
-### Docker
-
-Build and push Docker image:
+### Build for Production
 
 ```bash
-# Build image
-docker build -t crud-api-go:latest -f docker/Dockerfile .
+# Build the application
+go build -o bin/api cmd/api/main.go
 
-# Run container
-docker run -p 8080:8080 --env-file .env crud-api-go:latest
-```
-
-### Using Docker Compose in Production
-
-```bash
-# Build and start services
-docker-compose -f docker-compose.prod.yml up -d
-
-# Scale API instances
-docker-compose -f docker-compose.prod.yml up -d --scale api=3
+# Run the built binary
+./bin/api
 ```
 
 ### Environment Variables for Production
 
 Ensure the following environment variables are properly set:
 
-- Use strong `JWT_SECRET`
-- Set `APP_ENV=production`
-- Configure proper `DB_SSLMODE`
 - Use secure database credentials
-- Set appropriate `LOG_LEVEL`
+- Configure proper `DB_HOST` and `DB_PORT`
+- Set appropriate `SERVER_PORT`
 
 ### Cloud Deployment
 
 The application can be deployed to:
 
-- **AWS**: ECS, EKS, or Elastic Beanstalk
-- **Google Cloud**: Cloud Run, GKE
-- **Azure**: Container Instances, AKS
-- **Heroku**: Using container deployment
-- **DigitalOcean**: App Platform or Kubernetes
+- **AWS**: EC2, ECS, or Elastic Beanstalk
+- **Google Cloud**: Compute Engine, Cloud Run
+- **Azure**: Virtual Machines, Container Instances
+- **Heroku**: Using Go buildpack
+- **DigitalOcean**: Droplets or App Platform
 
 ## 🤝 Contributing
 
