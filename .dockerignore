@@ -1,0 +1,43 @@
+# Binarios
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Archivos de test
+*.test
+*.out
+
+# Directorios de dependencias
+vendor/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Archivos de documentación
+README.md
+LICENSE
+
+# Archivos de configuración local
+*.env
+.env.local
+
